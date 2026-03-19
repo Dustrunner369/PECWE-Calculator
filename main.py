@@ -24,3 +24,5 @@ async def calculate(request: Request):
     data = await request.json()
     # TODO: implement PECWE calculation logic
     return {"result": None, "input": data}
+
+# Hey this is JJ
