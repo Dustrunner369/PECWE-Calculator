@@ -18,7 +18,8 @@ form.addEventListener("submit", async (e) => {
   const payload = Object.fromEntries(formData.entries());
 
   try {
-    const res = await fetch("/api/calculate", {
+    const baseUrl = window.API_URL || "";
+    const res = await fetch(`${baseUrl}/api/calculate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
