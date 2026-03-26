@@ -1,5 +1,7 @@
 # PECWE-Calculator
 PECWE Calculator based off the following research papers:
+Mell, P., Bojanova, I., & Galhardo, C. (2024). Measuring the Exploitation of Weaknesses in the Wild. arXiv:2405.01289
+Silva, G. & Westphall, C. (2024). A Survey of Large Language Models in Cybersecurity. arXiv:2402.16968
 
 ## Prerequisites
 - [Docker](https://docs.docker.com/get-docker/)
