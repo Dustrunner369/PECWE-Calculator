@@ -1,0 +1,74 @@
+name: CWE Calculator CI
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Docker
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        run: docker build -t pecwe-backend ./backend
+
+      - name: Run test pipeline
+        id: test_run
+        run: |
+          docker run pecwe-backend python main.py --test | tee output.txt
+
+      - name: Extract PECWE value
+        id: extract
+        run: |
+          VALUE=$(grep "PECWE_RESULT" output.txt | cut -d "=" -f2)
+          echo "value=$VALUE" >> $GITHUB_OUTPUT
+          CWE=$(grep "TEST_CWE" output.txt | cut -d "=" -f2)
+          echo "cwe=$CWE" >> $GITHUB_OUTPUT
+          CVE_COUNT=$(grep "CVE_COUNT" output.txt | cut -d "=" -f2)
+          echo "cve_count=$CVE_COUNT" >> $GITHUB_OUTPUT
+          STATUS=$(grep "STATUS" output.txt | cut -d "=" -f2)
+          echo "status=$STATUS" >> $GITHUB_OUTPUT
+
+      - name: Compare against expected
+        id: compare
+        run: |
+          EXPECTED=0.05
+          ACTUAL=${{ steps.extract.outputs.value }}
+          DIFF=$(python3 -c "print(abs($EXPECTED - float('$ACTUAL')))")
+          echo "diff=$DIFF" >> $GITHUB_OUTPUT
+          if python3 -c "exit(0 if abs($EXPECTED - float('$ACTUAL')) > 0.1 else 1)"; then
+            echo "failed=true" >> $GITHUB_OUTPUT
+          else
+            echo "failed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Add summary
+        run: |
+          echo "## PECWE Test Result" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Test CWE | ${{ steps.extract.outputs.cwe }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| CVEs Found | ${{ steps.extract.outputs.cve_count }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Expected PECWE | 0.05 |" >> $GITHUB_STEP_SUMMARY
+          echo "| Actual PECWE | ${{ steps.extract.outputs.value }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Difference | ${{ steps.compare.outputs.diff }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Status | ${{ steps.extract.outputs.status }} |" >> $GITHUB_STEP_SUMMARY
+
+      - name: Create issue if test fails
+        if: steps.compare.outputs.failed == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: "PECWE Test Failed - CWE-79",
+              body: `## PECWE CI Test Failure\n\n**Test CWE:** ${{ steps.extract.outputs.cwe }}\n**Expected:** 0.05\n**Actual:** ${{ steps.extract.outputs.value }}\n**Difference:** ${{ steps.compare.outputs.diff }}\n\nThe calculated PECWE differs from the expected value by more than 0.1.`
+            })

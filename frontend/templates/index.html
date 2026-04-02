@@ -5,61 +5,172 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>PECWE Calculator</title>
 
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
     <!-- TailwindCSS via CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        base: {
+                            950: '#06090f',
+                            900: '#0a0e17',
+                            800: '#111827',
+                            700: '#1a2234',
+                            600: '#243044',
+                            500: '#334155',
+                        },
+                        amber: {
+                            400: '#e2b44a',
+                            500: '#d4a843',
+                            600: '#b8923a',
+                        },
+                        signal: {
+                            red: '#ef5350',
+                            orange: '#ff9800',
+                            yellow: '#e2b44a',
+                            green: '#4caf50',
+                            teal: '#4db6ac',
+                        }
+                    },
+                    fontFamily: {
+                        display: ['Space Grotesk', 'system-ui', 'sans-serif'],
+                        body: ['IBM Plex Sans', 'system-ui', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    }
+                }
+            }
+        }
+    </script>
 
     <!-- ApexCharts via CDN -->
     <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
 
     <link rel="stylesheet" href="/static/css/styles.css" />
 </head>
-<body class="bg-gray-50 min-h-screen">
+<body class="bg-base-950 min-h-screen text-gray-300 font-body antialiased">
 
-    <!-- Header -->
-    <header class="bg-white shadow">
-        <div class="max-w-7xl mx-auto px-4 py-6">
-            <h1 class="text-3xl font-bold text-gray-900">PECWE Calculator</h1>
-            <p class="mt-1 text-sm text-gray-500">Performance-based Energy and Carbon Weighted Estimate</p>
+    <!-- Top Bar -->
+    <header class="border-b border-base-600/50">
+        <div class="max-w-screen-xl mx-auto px-6 py-4 flex items-baseline justify-between">
+            <div class="flex items-baseline gap-3">
+                <h1 class="font-display text-lg font-600 tracking-tight text-gray-100">PECWE</h1>
+                <span class="text-xs text-base-500 font-mono uppercase tracking-widest">Calculator</span>
+            </div>
+            <div id="status-indicator" class="flex items-center gap-2 text-xs font-mono text-base-500">
+                <span class="status-dot"></span>
+                <span id="status-text">Ready</span>
+            </div>
         </div>
     </header>
 
-    <!-- Main Content -->
-    <main class="max-w-7xl mx-auto px-4 py-8">
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+    <main class="max-w-screen-xl mx-auto px-6">
 
-            <!-- Input Form -->
-            <section class="bg-white rounded-lg shadow p-6">
-                <h2 class="text-xl font-semibold text-gray-800 mb-4">Input Parameters</h2>
-                <form id="calc-form" class="space-y-4">
-                    <div>
-                        <label for="param1" class="block text-sm font-medium text-gray-700">Parameter 1</label>
-                        <input type="number" id="param1" name="param1"
-                               class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2" />
-                    </div>
-                    <div>
-                        <label for="param2" class="block text-sm font-medium text-gray-700">Parameter 2</label>
-                        <input type="number" id="param2" name="param2"
-                               class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2" />
-                    </div>
-                    <button type="submit"
-                            class="w-full bg-indigo-600 text-white py-2 px-4 rounded-md hover:bg-indigo-700 transition">
-                        Calculate
-                    </button>
-                </form>
-                <div id="results" class="mt-6 hidden">
-                    <h3 class="text-lg font-medium text-gray-800">Results</h3>
-                    <pre id="results-output" class="mt-2 bg-gray-100 rounded p-4 text-sm overflow-auto"></pre>
+        <!-- Query Bar -->
+        <section class="py-8 border-b border-base-700/40">
+            <form id="calc-form" class="flex items-end gap-4 flex-wrap">
+                <div class="flex-1 min-w-[240px]">
+                    <label for="cwe-input" class="block text-[11px] font-mono uppercase tracking-widest text-base-500 mb-2">CWE Identifier</label>
+                    <input
+                        type="text"
+                        id="cwe-input"
+                        name="cwe"
+                        placeholder="CWE-79"
+                        autocomplete="off"
+                        spellcheck="false"
+                        class="query-input"
+                    />
                 </div>
-            </section>
+                <button type="submit" id="submit-btn" class="submit-btn">
+                    <span id="btn-label">Analyze</span>
+                    <svg id="btn-spinner" class="hidden animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                        <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" opacity="0.25"/>
+                        <path d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                </button>
+            </form>
+        </section>
 
-            <!-- Chart Area -->
-            <section class="bg-white rounded-lg shadow p-6">
-                <h2 class="text-xl font-semibold text-gray-800 mb-4">Visualization</h2>
-                <div id="chart" class="w-full h-80"></div>
-            </section>
+        <!-- Empty State -->
+        <section id="empty-state" class="py-24 text-center">
+            <p class="font-display text-base-500 text-sm">Enter a CWE identifier to query NVD vulnerabilities and EPSS exploit probabilities.</p>
+            <p class="font-mono text-[11px] text-base-600 mt-3">Try CWE-79, CWE-89, or CWE-787</p>
+        </section>
 
-        </div>
+        <!-- Error State -->
+        <section id="error-state" class="hidden py-12">
+            <div class="border border-signal-red/20 bg-signal-red/5 rounded px-5 py-4">
+                <p class="font-mono text-sm text-signal-red" id="error-message"></p>
+            </div>
+        </section>
+
+        <!-- Results -->
+        <section id="results" class="hidden">
+
+            <!-- Metrics Row -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-px bg-base-700/30 mt-px">
+                <div class="metric-cell">
+                    <span class="metric-label">CWE</span>
+                    <span class="metric-value" id="metric-cwe">—</span>
+                </div>
+                <div class="metric-cell">
+                    <span class="metric-label">CVEs Found</span>
+                    <span class="metric-value" id="metric-count">—</span>
+                </div>
+                <div class="metric-cell">
+                    <span class="metric-label">Max EPSS</span>
+                    <span class="metric-value" id="metric-max-epss">—</span>
+                </div>
+                <div class="metric-cell">
+                    <span class="metric-label">Avg EPSS</span>
+                    <span class="metric-value" id="metric-avg-epss">—</span>
+                </div>
+            </div>
+
+            <!-- Main Content: Chart + Table -->
+            <div class="grid grid-cols-1 lg:grid-cols-5 gap-px bg-base-700/30 mt-px">
+
+                <!-- EPSS Distribution Chart -->
+                <div class="lg:col-span-3 bg-base-900 p-6">
+                    <h2 class="section-heading">EPSS Distribution</h2>
+                    <div id="chart" class="w-full" style="min-height: 360px;"></div>
+                </div>
+
+                <!-- CVE Table -->
+                <div class="lg:col-span-2 bg-base-900 p-6 overflow-hidden">
+                    <h2 class="section-heading">Vulnerabilities</h2>
+                    <div id="cve-table-wrap" class="overflow-y-auto" style="max-height: 360px;">
+                        <table class="w-full text-sm">
+                            <thead>
+                                <tr class="text-left text-[11px] font-mono uppercase tracking-widest text-base-500">
+                                    <th class="pb-3 pr-4 font-medium">CVE</th>
+                                    <th class="pb-3 pr-4 font-medium text-right">EPSS</th>
+                                    <th class="pb-3 font-medium text-right">Percentile</th>
+                                </tr>
+                            </thead>
+                            <tbody id="cve-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
     </main>
+
+    <!-- Footer -->
+    <footer class="mt-auto border-t border-base-700/30 py-6">
+        <div class="max-w-screen-xl mx-auto px-6">
+            <p class="text-[11px] font-mono text-base-600">
+                Data sourced from <span class="text-base-500">NVD</span> and <span class="text-base-500">FIRST EPSS</span> — results capped at 50 CVEs per query
+            </p>
+        </div>
+    </footer>
 
     <script>window.API_URL = "{{ api_url }}";</script>
     <script src="/static/js/app.js"></script>
