@@ -38,3 +38,15 @@ def compute_pecwe(cve_ids: list[str], epss_data: list[dict]) -> float:
     for cve in cve_ids:
         product *= 1.0 - epss_map.get(cve, 0.0)
     return 1.0 - product
+
+def resolve_cve_epss(cve_list, epss_data):
+    epss_map = {item["cve"]: float(item["epss"]) for item in epss_data}
+
+    resolved = []
+    for cve in cve_list:
+        resolved.append({
+            "cve": cve,
+            "epss": epss_map.get(cve, 0.0)
+        })
+
+    return resolved

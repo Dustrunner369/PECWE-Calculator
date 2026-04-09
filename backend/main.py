@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from services import resolve_cve_epss
 
 from routes import router
 
@@ -35,8 +36,11 @@ if __name__ == "__main__":
             epss_data = await fetch_epss(cve_list)
             print(f"EPSS_COUNT={len(epss_data)}")
 
-            if epss_data:
-                scores = [float(entry["epss"]) for entry in epss_data]
+
+            resolved = resolve_cve_epss(cve_list, epss_data)
+
+            if resolved:
+                scores = [item["epss"] for item in resolved]
                 pecwe = sum(scores) / len(scores)
             else:
                 pecwe = 0.0
