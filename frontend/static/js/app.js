@@ -12,7 +12,9 @@ const errorMessage = document.getElementById("error-message");
 const resultsSection = document.getElementById("results");
 
 // Metric elements
+const dateInput = document.getElementById("date-input");
 const metricCwe = document.getElementById("metric-cwe");
+const metricPecwe = document.getElementById("metric-pecwe");
 const metricCount = document.getElementById("metric-count");
 const metricMaxEpss = document.getElementById("metric-max-epss");
 const metricAvgEpss = document.getElementById("metric-avg-epss");
@@ -172,6 +174,15 @@ function renderMetrics(data) {
     metricCwe.textContent = data.cwe;
     metricCount.textContent = data.cve_count;
 
+    const pecwe = typeof data.pecwe === "number" ? data.pecwe : null;
+    if (pecwe !== null) {
+        metricPecwe.textContent = formatEpss(pecwe);
+        metricPecwe.className = "metric-value epss-" + getEpssSeverity(pecwe);
+    } else {
+        metricPecwe.textContent = "—";
+        metricPecwe.className = "metric-value";
+    }
+
     if (data.epss && data.epss.length > 0) {
         const scores = data.epss.map((e) => parseFloat(e.epss)).filter((n) => !isNaN(n));
         const max = Math.max(...scores);
@@ -290,7 +301,7 @@ form.addEventListener("submit", async (e) => {
         const res = await fetch(`${baseUrl}/api/calculate`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ cwe }),
+            body: JSON.stringify({ cwe, date: dateInput.value || undefined }),
         });
 
         if (!res.ok) {
@@ -334,4 +345,6 @@ document.addEventListener("keydown", (e) => {
 });
 
 // --- Init ---
+dateInput.value = new Date().toISOString().slice(0, 10);
+dateInput.max = dateInput.value;
 initChart();

@@ -15,13 +15,26 @@ async def fetch_cves(cwe_id: str, limit: int = 50) -> list[str]:
         return [item["cve"]["id"] for item in vulnerabilities]
 
 
-async def fetch_epss(cve_ids: list[str]) -> list[dict]:
+async def fetch_epss(cve_ids: list[str], date: str | None = None) -> list[dict]:
     if not cve_ids:
         return []
+    params = {"cve": ",".join(cve_ids)}
+    if date:
+        params["date"] = date
     async with httpx.AsyncClient() as client:
-        response = await client.get(
-            EPSS_API_URL,
-            params={"cve": ",".join(cve_ids)},
-        )
+        response = await client.get(EPSS_API_URL, params=params)
         response.raise_for_status()
         return response.json().get("data", [])
+
+
+def compute_pecwe(cve_ids: list[str], epss_data: list[dict]) -> float:
+    """PECWE(x, d) = 1 - prod(1 - EPSS(y, d)) for all y in S_x.
+
+    CVEs missing from epss_data (e.g. not yet published on date d) are
+    treated as having EPSS = 0, contributing a factor of 1.
+    """
+    epss_map = {entry["cve"]: float(entry.get("epss", 0) or 0) for entry in epss_data}
+    product = 1.0
+    for cve in cve_ids:
+        product *= 1.0 - epss_map.get(cve, 0.0)
+    return 1.0 - product

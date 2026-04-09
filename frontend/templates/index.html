@@ -86,6 +86,15 @@
                         class="query-input"
                     />
                 </div>
+                <div class="min-w-[180px]">
+                    <label for="date-input" class="block text-[11px] font-mono uppercase tracking-widest text-base-500 mb-2">Date</label>
+                    <input
+                        type="date"
+                        id="date-input"
+                        name="date"
+                        class="query-input"
+                    />
+                </div>
                 <button type="submit" id="submit-btn" class="submit-btn">
                     <span id="btn-label">Analyze</span>
                     <svg id="btn-spinner" class="hidden animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
@@ -113,10 +122,14 @@
         <section id="results" class="hidden">
 
             <!-- Metrics Row -->
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-px bg-base-700/30 mt-px">
+            <div class="grid grid-cols-2 md:grid-cols-5 gap-px bg-base-700/30 mt-px">
                 <div class="metric-cell">
                     <span class="metric-label">CWE</span>
                     <span class="metric-value" id="metric-cwe">—</span>
+                </div>
+                <div class="metric-cell">
+                    <span class="metric-label">PECWE (30d)</span>
+                    <span class="metric-value" id="metric-pecwe">—</span>
                 </div>
                 <div class="metric-cell">
                     <span class="metric-label">CVEs Found</span>
