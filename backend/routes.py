@@ -2,7 +2,7 @@ from fastapi import APIRouter, Request
 
 from datetime import date as _date
 
-from services import compute_pecwe, fetch_cves, fetch_epss
+from services import compute_pecwe, fetch_cves, fetch_epss, resolve_cve_epss, calculate_trend
 
 router = APIRouter(prefix="/api")
 
@@ -25,6 +25,10 @@ async def calculate(request: Request):
     epss_data = await fetch_epss(cve_list, date=date_str)
     pecwe = compute_pecwe(cve_list, epss_data)
 
+    resolved = resolve_cve_epss(cve_list, epss_data)
+
+    trend = calculate_trend(resolved)
+
     return {
         "cwe": cwe_id,
         "date": date_str,
@@ -32,4 +36,7 @@ async def calculate(request: Request):
         "cves": cve_list,
         "epss": epss_data,
         "pecwe": pecwe,
+        "resolved": resolved,
+        "trend": trend,
+
     }

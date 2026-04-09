@@ -50,3 +50,31 @@ def resolve_cve_epss(cve_list, epss_data):
         })
 
     return resolved
+
+def calculate_trend(resolved_data):
+    recent = []
+    old = []
+
+    for item in resolved_data:
+        cve = item["cve"]
+        epss = item["epss"]
+
+        year = int(cve.split("-")[1])
+
+        if year >= 2022:
+            recent.append(epss)
+        else:
+            old.append(epss)
+
+    if not recent or not old:
+        return "STABLE"
+
+    avg_recent = sum(recent) / len(recent)
+    avg_old = sum(old) / len(old)
+
+    if avg_recent > avg_old + 0.1:
+        return "UP"
+    elif avg_recent < avg_old - 0.1:
+        return "DOWN"
+    else:
+        return "STABLE"
