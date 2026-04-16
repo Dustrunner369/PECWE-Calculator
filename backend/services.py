@@ -1,7 +1,29 @@
+import json
+from pathlib import Path
+
 import httpx
 
 NVD_API_URL = "https://services.nvd.nist.gov/rest/json/cves/2.0"
 EPSS_API_URL = "https://api.first.org/data/v1/epss"
+
+_HIERARCHY_PATH = Path(__file__).parent / "data" / "cwe_1003.json"
+with _HIERARCHY_PATH.open() as _f:
+    _HIERARCHY = json.load(_f)
+
+CWE_NAMES: dict[str, str] = _HIERARCHY["names"]
+CWE_CHILDREN: dict[str, list[str]] = _HIERARCHY["children"]
+
+
+def get_cwe_name(cwe_id: str) -> str | None:
+    return CWE_NAMES.get(cwe_id)
+
+
+def get_children(cwe_id: str) -> list[str]:
+    return CWE_CHILDREN.get(cwe_id, [])
+
+
+def is_parent(cwe_id: str) -> bool:
+    return cwe_id in CWE_CHILDREN
 
 
 async def fetch_cves(cwe_id: str, limit: int = 50) -> list[str]:
@@ -15,16 +37,23 @@ async def fetch_cves(cwe_id: str, limit: int = 50) -> list[str]:
         return [item["cve"]["id"] for item in vulnerabilities]
 
 
+EPSS_BATCH_SIZE = 100  # FIRST EPSS API silently returns empty above ~100 CVEs.
+
+
 async def fetch_epss(cve_ids: list[str], date: str | None = None) -> list[dict]:
     if not cve_ids:
         return []
-    params = {"cve": ",".join(cve_ids)}
-    if date:
-        params["date"] = date
+    results: list[dict] = []
     async with httpx.AsyncClient() as client:
-        response = await client.get(EPSS_API_URL, params=params)
-        response.raise_for_status()
-        return response.json().get("data", [])
+        for i in range(0, len(cve_ids), EPSS_BATCH_SIZE):
+            batch = cve_ids[i : i + EPSS_BATCH_SIZE]
+            params = {"cve": ",".join(batch)}
+            if date:
+                params["date"] = date
+            response = await client.get(EPSS_API_URL, params=params)
+            response.raise_for_status()
+            results.extend(response.json().get("data", []))
+    return results
 
 
 def compute_pecwe(cve_ids: list[str], epss_data: list[dict]) -> float:

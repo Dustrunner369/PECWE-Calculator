@@ -1,15 +1,35 @@
-from fastapi import APIRouter, Request
-
+import asyncio
 from datetime import date as _date
 
-from services import compute_pecwe, fetch_cves, fetch_epss, resolve_cve_epss, calculate_trend
+from fastapi import APIRouter, Request
+
+from services import (
+    fetch_cves,
+    fetch_epss,
+    get_children,
+    get_cwe_name,
+    is_parent,
+)
 
 router = APIRouter(prefix="/api")
+
+AGGREGATE_CVE_LIMIT = 200
+SINGLE_CVE_LIMIT = 50
 
 
 @router.get("/health")
 async def health():
     return {"status": "ok"}
+
+
+async def _fetch_one(cwe_id: str, date_str: str, limit: int):
+    cves = await fetch_cves(cwe_id, limit=limit)
+    epss = await fetch_epss(cves, date=date_str) if cves else []
+    return cwe_id, {
+        "name": get_cwe_name(cwe_id),
+        "cves": cves,
+        "epss": epss,
+    }
 
 
 @router.post("/calculate")
@@ -21,22 +41,20 @@ async def calculate(request: Request):
     if not cwe_id:
         return {"error": "Missing CWE"}
 
-    cve_list = await fetch_cves(cwe_id)
-    epss_data = await fetch_epss(cve_list, date=date_str)
-    pecwe = compute_pecwe(cve_list, epss_data)
+    parent = is_parent(cwe_id)
+    if parent:
+        cwes = [cwe_id] + get_children(cwe_id)
+        limit = AGGREGATE_CVE_LIMIT
+    else:
+        cwes = [cwe_id]
+        limit = SINGLE_CVE_LIMIT
 
-    resolved = resolve_cve_epss(cve_list, epss_data)
-
-    trend = calculate_trend(resolved)
+    results = await asyncio.gather(*[_fetch_one(c, date_str, limit) for c in cwes])
+    per_cwe = {cwe: payload for cwe, payload in results}
 
     return {
         "cwe": cwe_id,
+        "is_parent": parent,
         "date": date_str,
-        "cve_count": len(cve_list),
-        "cves": cve_list,
-        "epss": epss_data,
-        "pecwe": pecwe,
-        "resolved": resolved,
-        "trend": trend,
-
+        "per_cwe": per_cwe,
     }

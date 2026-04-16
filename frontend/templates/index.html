@@ -87,11 +87,17 @@
                     />
                 </div>
                 <div class="min-w-[180px]">
-                    <label for="date-input" class="block text-[11px] font-mono uppercase tracking-widest text-base-500 mb-2">Date</label>
+                    <label for="date-input" class="block text-[11px] font-mono uppercase tracking-widest text-base-500 mb-2">Date (YYYY-MM-DD)</label>
                     <input
-                        type="date"
+                        type="text"
                         id="date-input"
                         name="date"
+                        placeholder="2025-04-16"
+                        pattern="\d{4}-\d{2}-\d{2}"
+                        inputmode="numeric"
+                        autocomplete="off"
+                        spellcheck="false"
+                        maxlength="10"
                         class="query-input"
                     />
                 </div>
@@ -120,6 +126,22 @@
 
         <!-- Results -->
         <section id="results" class="hidden">
+
+            <!-- Child CWE toggles (only shown when CWE is a parent in View-1003) -->
+            <div id="chip-row" class="hidden py-5 border-b border-base-700/40">
+                <div class="flex items-center justify-between gap-4 mb-3">
+                    <div class="flex items-baseline gap-3">
+                        <span class="text-[11px] font-mono uppercase tracking-widest text-base-500">View-1003 Hierarchy</span>
+                        <span id="chip-summary" class="text-[11px] font-mono text-base-500"></span>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="include-all-children" checked />
+                        <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                        <span class="toggle-label">Include all children</span>
+                    </label>
+                </div>
+                <div id="chip-list" class="flex flex-wrap gap-2"></div>
+            </div>
 
             <!-- Metrics Row -->
             <div class="grid grid-cols-2 md:grid-cols-5 gap-px bg-base-700/30 mt-px">
@@ -180,7 +202,7 @@
     <footer class="mt-auto border-t border-base-700/30 py-6">
         <div class="max-w-screen-xl mx-auto px-6">
             <p class="text-[11px] font-mono text-base-600">
-                Data sourced from <span class="text-base-500">NVD</span> and <span class="text-base-500">FIRST EPSS</span> — results capped at 50 CVEs per query
+                Data sourced from <span class="text-base-500">NVD</span> and <span class="text-base-500">FIRST EPSS</span> — 50 CVEs per single CWE, 200 per CWE for View-1003 aggregates
             </p>
         </div>
     </footer>

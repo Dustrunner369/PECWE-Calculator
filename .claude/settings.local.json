@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir -p /Users/matthewswift/Documents/School/Semesters/25-26/SP26/TopicsInCS/PECWE-Calculator/backend/data)",
+      "Bash(cp /tmp/cwe1003/hierarchy.json /Users/matthewswift/Documents/School/Semesters/25-26/SP26/TopicsInCS/PECWE-Calculator/backend/data/cwe_1003.json)"
+    ]
+  }
+}

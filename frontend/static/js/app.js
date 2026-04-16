@@ -19,8 +19,20 @@ const metricCount = document.getElementById("metric-count");
 const metricMaxEpss = document.getElementById("metric-max-epss");
 const metricAvgEpss = document.getElementById("metric-avg-epss");
 
+// Chip row
+const chipRow = document.getElementById("chip-row");
+const chipList = document.getElementById("chip-list");
+const chipSummary = document.getElementById("chip-summary");
+const includeAllToggle = document.getElementById("include-all-children");
+
 // Table
 const cveTbody = document.getElementById("cve-tbody");
+
+// --- State ---
+let currentPerCwe = {};     // { "CWE-20": { name, cves, epss }, ... }
+let primaryCwe = null;      // the CWE the user typed
+let childCwes = [];         // children of primaryCwe (empty if not a parent)
+const selectedCwes = new Set();
 
 // --- Chart setup ---
 let chart = null;
@@ -168,13 +180,70 @@ function normalizeCwe(raw) {
     return trimmed;
 }
 
+// --- Aggregate computation (client-side) ---
+
+function computeAggregate() {
+    // Union of CVEs + EPSS records across selected CWEs, deduped by CVE id.
+    const cveSet = new Set();
+    const epssMap = new Map(); // cve -> epss record
+
+    for (const cwe of selectedCwes) {
+        const bucket = currentPerCwe[cwe];
+        if (!bucket) continue;
+        for (const cve of bucket.cves) cveSet.add(cve);
+        for (const entry of bucket.epss) {
+            if (!epssMap.has(entry.cve)) epssMap.set(entry.cve, entry);
+        }
+    }
+
+    const cves = Array.from(cveSet);
+    const epss = Array.from(epssMap.values());
+
+    // PECWE = 1 - prod(1 - EPSS(cve))  over the unique CVE set.
+    // CVEs with no EPSS entry contribute a factor of 1 (EPSS = 0).
+    let product = 1.0;
+    for (const cve of cves) {
+        const entry = epssMap.get(cve);
+        const score = entry ? parseFloat(entry.epss) || 0 : 0;
+        product *= 1 - score;
+    }
+    const pecwe = 1 - product;
+
+    return { cves, epss, pecwe, cve_count: cves.length };
+}
+
+function computeTrend(epssRecords) {
+    const recent = [];
+    const old = [];
+    for (const entry of epssRecords) {
+        const year = parseInt(entry.cve.split("-")[1], 10);
+        const score = parseFloat(entry.epss) || 0;
+        if (Number.isNaN(year)) continue;
+        (year >= 2022 ? recent : old).push(score);
+    }
+    if (!recent.length || !old.length) return "STABLE";
+    const avg = (arr) => arr.reduce((a, b) => a + b, 0) / arr.length;
+    const avgRecent = avg(recent);
+    const avgOld = avg(old);
+    if (avgRecent > avgOld + 0.1) return "UP";
+    if (avgRecent < avgOld - 0.1) return "DOWN";
+    return "STABLE";
+}
+
 // --- Render results ---
 
-function renderMetrics(data) {
-    metricCwe.textContent = data.cwe;
-    metricCount.textContent = data.cve_count;
+function renderMetrics(agg) {
+    // Metric CWE label: primary + child count indicator if aggregate
+    if (childCwes.length > 0) {
+        const selectedCount = selectedCwes.size;
+        metricCwe.textContent = `${primaryCwe} +${Math.max(selectedCount - 1, 0)}`;
+    } else {
+        metricCwe.textContent = primaryCwe;
+    }
 
-    const pecwe = typeof data.pecwe === "number" ? data.pecwe : null;
+    metricCount.textContent = agg.cve_count;
+
+    const pecwe = typeof agg.pecwe === "number" ? agg.pecwe : null;
     if (pecwe !== null) {
         metricPecwe.textContent = formatEpss(pecwe);
         metricPecwe.className = "metric-value epss-" + getEpssSeverity(pecwe);
@@ -183,10 +252,10 @@ function renderMetrics(data) {
         metricPecwe.className = "metric-value";
     }
 
-    if (data.epss && data.epss.length > 0) {
-        const scores = data.epss.map((e) => parseFloat(e.epss)).filter((n) => !isNaN(n));
-        const max = Math.max(...scores);
-        const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
+    if (agg.epss && agg.epss.length > 0) {
+        const scores = agg.epss.map((e) => parseFloat(e.epss)).filter((n) => !isNaN(n));
+        const max = scores.length ? Math.max(...scores) : 0;
+        const avg = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
 
         metricMaxEpss.textContent = formatEpss(max);
         metricMaxEpss.className = "metric-value epss-" + getEpssSeverity(max);
@@ -201,19 +270,13 @@ function renderMetrics(data) {
     }
 }
 
-function renderTable(data) {
+function renderTable(agg) {
     cveTbody.innerHTML = "";
 
-    // Build a map of CVE -> EPSS data
     const epssMap = {};
-    if (data.epss) {
-        data.epss.forEach((entry) => {
-            epssMap[entry.cve] = entry;
-        });
-    }
+    for (const entry of agg.epss) epssMap[entry.cve] = entry;
 
-    // Sort CVEs by EPSS score descending
-    const sorted = [...data.cves].sort((a, b) => {
+    const sorted = [...agg.cves].sort((a, b) => {
         const scoreA = epssMap[a] ? parseFloat(epssMap[a].epss) : 0;
         const scoreB = epssMap[b] ? parseFloat(epssMap[b].epss) : 0;
         return scoreB - scoreA;
@@ -247,14 +310,13 @@ function renderTable(data) {
     });
 }
 
-function renderChart(data) {
-    if (!data.epss || data.epss.length === 0) {
+function renderChart(agg) {
+    if (!agg.epss || agg.epss.length === 0) {
         chart.updateSeries([{ name: "EPSS Score", data: [] }]);
         return;
     }
 
-    // Sort by EPSS score descending, take top 25 for readability
-    const sorted = [...data.epss]
+    const sorted = [...agg.epss]
         .map((e) => ({ cve: e.cve, score: parseFloat(e.epss) || 0 }))
         .sort((a, b) => b.score - a.score)
         .slice(0, 25);
@@ -281,6 +343,89 @@ function renderChart(data) {
     });
 }
 
+function renderAll() {
+    const agg = computeAggregate();
+    renderMetrics(agg);
+    renderTable(agg);
+    renderChart(agg);
+    updateChipSummary(agg);
+    syncIncludeAllToggle();
+}
+
+// --- Chips ---
+
+function renderChips() {
+    chipList.innerHTML = "";
+
+    if (childCwes.length === 0) {
+        chipRow.classList.add("hidden");
+        return;
+    }
+
+    chipRow.classList.remove("hidden");
+
+    const order = [primaryCwe, ...childCwes];
+    for (const cwe of order) {
+        const bucket = currentPerCwe[cwe] || {};
+        const name = bucket.name || "";
+        const count = (bucket.cves || []).length;
+        const isPrimary = cwe === primaryCwe;
+
+        const chip = document.createElement("button");
+        chip.type = "button";
+        chip.className = "cwe-chip" + (isPrimary ? " is-parent" : "");
+        if (selectedCwes.has(cwe)) chip.classList.add("is-selected");
+        chip.title = `${cwe} — ${name} · ${count} CVEs`;
+        chip.innerHTML = `
+            <span class="chip-dot"></span>
+            <span>${cwe}</span>
+            <span class="chip-name">${name}</span>
+        `;
+        chip.addEventListener("click", () => toggleCwe(cwe));
+        chipList.appendChild(chip);
+    }
+}
+
+function toggleCwe(cwe) {
+    if (selectedCwes.has(cwe)) {
+        selectedCwes.delete(cwe);
+    } else {
+        selectedCwes.add(cwe);
+    }
+    // Update the specific chip class without full rerender
+    const idx = [primaryCwe, ...childCwes].indexOf(cwe);
+    if (idx >= 0 && chipList.children[idx]) {
+        chipList.children[idx].classList.toggle("is-selected", selectedCwes.has(cwe));
+    }
+    renderAll();
+}
+
+function updateChipSummary(agg) {
+    if (childCwes.length === 0) {
+        chipSummary.textContent = "";
+        return;
+    }
+    const childrenSelected = childCwes.filter((c) => selectedCwes.has(c)).length;
+    const parentSelected = selectedCwes.has(primaryCwe) ? 1 : 0;
+    chipSummary.textContent = `${parentSelected + childrenSelected}/${childCwes.length + 1} selected · ${agg.cve_count} unique CVEs`;
+}
+
+function syncIncludeAllToggle() {
+    // Toggle reflects whether every CHILD is selected (parent is independent).
+    const allChildrenOn = childCwes.length > 0 && childCwes.every((c) => selectedCwes.has(c));
+    includeAllToggle.checked = allChildrenOn;
+}
+
+includeAllToggle.addEventListener("change", (e) => {
+    const on = e.target.checked;
+    for (const c of childCwes) {
+        if (on) selectedCwes.add(c);
+        else selectedCwes.delete(c);
+    }
+    renderChips();
+    renderAll();
+});
+
 // --- Form submission ---
 
 form.addEventListener("submit", async (e) => {
@@ -293,7 +438,6 @@ form.addEventListener("submit", async (e) => {
     }
 
     const cwe = normalizeCwe(rawCwe);
-    cweInput.value = cwe;
     setLoading(true);
 
     try {
@@ -316,18 +460,32 @@ form.addEventListener("submit", async (e) => {
             return;
         }
 
-        if (data.cve_count === 0) {
+        // Reset state from new response
+        currentPerCwe = data.per_cwe || {};
+        primaryCwe = data.cwe;
+        childCwes = data.is_parent
+            ? Object.keys(currentPerCwe).filter((c) => c !== primaryCwe)
+            : [];
+
+        // Default selection: everything that was fetched
+        selectedCwes.clear();
+        for (const c of Object.keys(currentPerCwe)) selectedCwes.add(c);
+
+        const initialAgg = computeAggregate();
+        if (initialAgg.cve_count === 0) {
             showError(`No CVEs found for ${cwe}. Verify the identifier and try again.`);
             return;
         }
 
         showResults();
-        renderMetrics(data);
-        renderTable(data);
-        renderChart(data);
-        setStatus("active", `${data.cve_count} CVEs loaded`);
+        renderChips();
+        renderAll();
 
-        // Fade status back after a moment
+        const label = data.is_parent
+            ? `${initialAgg.cve_count} CVEs across ${selectedCwes.size} CWEs`
+            : `${initialAgg.cve_count} CVEs loaded`;
+        setStatus("active", label);
+
         setTimeout(() => setStatus("idle", "Ready"), 4000);
     } catch (err) {
         showError("Request failed: " + err.message);
@@ -346,5 +504,4 @@ document.addEventListener("keydown", (e) => {
 
 // --- Init ---
 dateInput.value = new Date().toISOString().slice(0, 10);
-dateInput.max = dateInput.value;
 initChart();
