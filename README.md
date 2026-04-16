@@ -6,8 +6,6 @@ Mell, P., Bojanova, I., & Galhardo, C. (2024). Measuring the Exploitation of Wea
 
 ![](https://github.com/Dustrunner369/PECWE-Calculator/blob/main/CWE-79.gif)
 
-![](https://github.com/Dustrunner369/PECWE-Calculator/blob/main/Aggregation.gif)
-
 ## Prerequisites
 
 - [Docker](https://docs.docker.com/get-docker/)
