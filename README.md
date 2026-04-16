@@ -38,9 +38,26 @@ curl -X POST http://localhost:8000/api/calculate \
   -d '{"cwe": "CWE-79"}'
 ```
 
-This returns a JSON response with:
-- `cve_count` — number of CVEs found
-- `cves` — list of CVE IDs
-- `epss` — EPSS exploit probability scores for each CVE
+The response contains:
+- `cwe` — the CWE queried
+- `is_parent` — whether the CWE is a parent in CWE View-1003
+- `date` — the date used for EPSS lookup
+- `per_cwe` — map of each CWE (parent + children, if any) to its `name`, `cves`, and `epss` records
 
-> **Note:** NVD results are capped at 50 per request to respect API rate limits. This will be changed in future versions.
+## Calculation
+
+For a set of CVEs *S* mapped to a CWE *x* on date *d*, PECWE is:
+
+> PECWE(x, d) = 1 − ∏<sub>y ∈ S</sub> (1 − EPSS(y, d))
+
+EPSS is the per-CVE exploit probability from [FIRST EPSS](https://www.first.org/epss/). CVEs with no EPSS record on *d* are treated as 0, contributing a factor of 1.
+
+## Parent / Child Aggregation (View-1003)
+
+[CWE View-1003](https://cwe.mitre.org/data/definitions/1003.html) organizes weaknesses into a two-level tree of parents and children. When the queried CWE is a parent, the backend fetches CVEs for the parent and every child in parallel and returns them in `per_cwe`.
+
+The frontend renders a chip for each CWE; toggling chips recomputes the aggregate client-side by taking the **union of unique CVEs** across the selected CWEs and applying the same PECWE formula. A CVE mapped to multiple CWEs is counted once.
+
+## Rate Limits
+
+NVD results are capped at 50 CVEs for single-CWE queries and 200 per CWE for View-1003 aggregate queries. EPSS requests are batched at 100 CVEs per call.
