@@ -4,6 +4,10 @@ PECWE Calculator based off the following research papers:
 
 Mell, P., Bojanova, I., & Galhardo, C. (2024). Measuring the Exploitation of Weaknesses in the Wild. arXiv:2405.01289
 
+![](https://github.com/PECWE-Calculator/CWE-79.gif)
+
+![](https://github.com/PECWE-Calculator/Aggregation.gif)
+
 ## Prerequisites
 
 - [Docker](https://docs.docker.com/get-docker/)
