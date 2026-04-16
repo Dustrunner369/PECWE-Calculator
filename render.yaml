@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: pecwe-api
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    envVars:
+      - key: PORT
+        value: "8000"
+    healthCheckPath: /api/health
+
+  - type: web
+    name: pecwe-frontend
+    runtime: docker
+    dockerfilePath: ./frontend/Dockerfile
+    dockerContext: ./frontend
+    envVars:
+      - key: API_URL
+        fromService:
+          name: pecwe-api
+          type: web
+          property: host
+      - key: PORT
+        value: "3000"
