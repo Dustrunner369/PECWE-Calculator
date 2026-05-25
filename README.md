@@ -1,6 +1,8 @@
-# PECWE-Calculator
+# PECWE Calculator
 
-PECWE Calculator based off the following research papers:
+A web application that calculates the probability that a given CWE will be exploited within 30 days of a given date by aggregating EPSS scores across its associated CVES.
+
+Based off the following research paper:
 
 Mell, P., Bojanova, I., & Galhardo, C. (2024). Measuring the Exploitation of Weaknesses in the Wild. arXiv:2405.01289
 ##
